@@ -4,7 +4,7 @@
     * Team Name: UPenn Fire Department
     * Team Members: Isaac Gray, Oliver Hendrych
     * Github Repository URL: https://github.com/ese3500/final-project-upenn-fire-department
-    * Github Pages Website URL: [for final submission]
+    * Github Pages Website URL: https://ese3500.github.io/final-project-upenn-fire-department/
     * Description of hardware: See '9. Components' below 
 
 ## Final Project Proposal
@@ -33,7 +33,7 @@ Formulate key software requirements here.
 
 #### Overview
 
-The project will mainly revolve around taking in sensor input to determine motor controlled output, and using that feedback loop to operate. Wireless communication and the ultrasonic sensor will inform movement, which will cause the readings from the ultrasonic sensor and thermal camera to change. The thermal imaging will inform the water turret aiming and firing, which will in turn change the thermals seen by the camera.
+The project will mainly revolve around taking in sensor input to determine motor controlled output, and using that feedback loop to operate. Wireless communication, the ultrasonic sensor, and the thermal camera will inform movement, which will cause the readings from the ultrasonic sensor and thermal camera to change. The thermal imaging will inform the water turret aiming and firing, which will in turn change the thermals seen by the camera.
 
 #### Users
 
@@ -182,17 +182,113 @@ What were your results? Namely, what was the final solution/design to your probl
 
 Based on your quantified system performance, comment on how you achieved or fell short of your expected software requirements. You should be quantifying this, using measurement tools to collect data.
 
+These are our software requirements that we created when starting our project. We will go through each one and evaluate how well, if at all, the requirement was achieved. 
+
+**Definitions for reference** 
+* MT = Motors used to drive
+* MC = Microcontroller
+* RC = Remote Communication
+* TI = Thermal Imaging
+* US = Ultrasonic sensor
+* WT = Water turret (and the motors used to drive it)
+* WG = Water gun (and the motor used to fire it)
+* WP = Waterproofing (shell for other means)
+
+SRS 01 - 'The US shall be sampled as often as possible, and results smoothed/averaged to reduce the effect of noise'
+
+This SRS was met in full. By using timers for the trigger and echo, we were sending out triggers soon after echos were received, and also sent them after a timeout (if no echo was received). These results were smoothed with a configurable number of values to include in the average, for which we went with 4 in the final design for a mix of accuracy and quick response time.
+
+SRS 02 - 'MT shall be controlled using PWM outputs from MC to determine speed'
+
+We found that it was not necessary to use the PWM outputs from the MC in order to control the MT because the motors acted at a fine speed to begin with. Also, the ATMega would not have had enough timers to control all 4 of the MT outputs individually, in conjuction with our other features. A simple but sufficient system to control the front/back left/right motors with just the pin outputs was used.
+
+SRS 03 - 'The hottest heat source in the TI shall be indentified and targeted by WT'
+
+This SRS was met in full. By querying the entire output of the TI over I2C, we were able to get all the values within the 8x8 frame that the TI sensed. An I2C watchdog was implemented so that if no response was detected from the TI, the MC would restart communication, as it is likely message(s) were lost. Additionally, the TI only operated at 10Hz (max), and we were able to sense all values within that time, so no data was lost. The hottest heat source was identified with a simple maximum. However, we ran into some issues as some sensors within the 8x8 array were biased to detect a higher temperature than others. As such, we chose to neglect those values when finding which pixel was hottest. The heat source was target by WT, as we would turn the katzbot if the heat source was determined to be on the corresponding edge of the TI readings. It would therefore center on the target and prepare to fire.
+
+SRS 04 - 'If a sufficiently hot heat source is identifed by `SRS 03`, WG shall be fired'
+
+This SRS was met in full. A configurable threshold was used to determine when the WG was fired. If the hottest pixel as identified in `SRS 03` was above this threshold, WG would fire. In addition, in order to prevent the water from splashing back, the US output from `SRS 01` would be used to determine if we were too close to the target (as according to another configurable limit). If so, then WG would not fire.
+
+SRS 05 - 'Output from US as specified in `SRS 01` shall prevent MT from driving device into the wall'
+
+This SRS was met in full. A configurable limit for how close the katzbot would get to the wall while still moving forward was set. In autonomous mode, the MT would be set to turn right (in place) instead whenever the US measured too small of a distance. In manual mode, the forward motors would not be enabled if a all was detected.
+
+SRS 06 - 'Along with US input from `SRS 05` and `SRS 01`, RC shall inform output to MT using tank controls'
+
+This SRS was met in full. By using inputs from the ESP32 Feather in combination with Blynk.io, we were able to remotely control the katzbot using our laptops or phones. It was with tank controls that one can move the robot, with individual buttons for controlling the front/back left/right motors. Additional software checks were added to prevent the user from trying to move both forward and back on the same side (left/right).
+
+SRS 07 - 'Manual control of WT and WG should be possible through use of RC'
+
+While the WT (katzbot itself) could be controlled using RC, the recommendation of also controlling the WG was not met due to the limitations of a free Blynk.io account. With only 5 inputs available, 4 were used for movement controls and 1 was used to determine which mode (autonomous or manual) the MC would operate in. However, given the amount of configurability in the WG behavior and with the use case commonly being in areas not directly visible by the user, we determined this semi-autonomous mode of controlling the WG was acceptable.
+
 #### 3.2 Hardware Requirements Specification (HRS) Results
 
 Based on your quantified system performance, comment on how you achieved or fell short of your expected hardware requirements. You should be quantifying this, using measurement tools to collect data.
+
+These are our hardware requirements that we created when starting our project. We will go through each one and evaluate how well, if at all, the requirement was achieved. 
+
+**Definitions for reference** 
+* MT = Motors used to drive
+* MC = Microcontroller
+* RC = Remote Communication
+* TI = Thermal Imaging
+* US = Ultrasonic sensor
+* WT = Water turret (and the motors used to drive it)
+* WG = Water gun (and the motor used to fire it)
+* WP = Waterproofing (shell for other means)
+
+HRS 01 - 'MT shall be controlled through driving circuit, which is in turn shall be driven by MC'
+
+This was achieved by using a prebuilt motor driver, the katzbot. This allowed us to only need to control the motor signal with out ATMega. This allowed us to not have to worry about the actual motor drive which would have been much more difficult and outside the scope of the class. Additionally, the load on the MC pins itself was much reduced.
+
+HRS 02 - 'RC shall be provided by Feather ESP32 or other means, connected to MC'
+
+This HRS was also acheived. We used the Blynk.io dashboard along with an ESP32 feather to wirelessly communicate between a "home base" (a laptop or phone) and the bot. From there we connected the ESP32 to a level shifter which then went to the the ATEMEGA and we drove the motor using pin change interrupts from those inputs.
+
+HRS 03 - 'TI shall be provided by camera, which should be cheap and low resolution'
+
+This we also acheived using a AMG8833 infared camera which was not super cheap but it was within budget at ~45 dollars, and was the cheapest, easy to use option found. It was realtively low resolution but worked perfectly for our purposes. It has 64 pixels but a relatively narrow field of view, so for what it could see it was detailed enough to sense large areas of heat which is what we were scanning for. 
+
+HRS 04 - 'TI shall be connected to MC, and communicate through SPI'
+
+Here our final project slightly differed from the hardware specifications. We ended up selecting a TI that communicated with I2C rather than SPI. This made hardware even easier only needing to route two wires especially with how many wires we had to use. However it did lead to some software issues that we discussed in the software specifications section. The relatively smaller bandwidth of I2C was not an issue as the TI only sampled at 10Hz, meaning we were able to read everything necessary within a frame of the TI.
+
+HRS 05 - 'TI shall be mounted to front of device, or should be mounted to WT'
+
+The TI ended up being mounted right in the center and front of the bot. However we changed the mechanical design of our project to remove the WT and instead used the katzbot to hold everything. This meant that the TI wasn't connected to the WT but it was connected to the front of the device. 
+
+HRS 06 - 'US shall be mounted to front of device, or optionally to mounted to WT'
+
+As described above, we did not use a turret to hold our sensors and instead attached both the US and TI to the front of our katzbot. The US was slightly off center to accomadate the TI which we wanted to be centered with the WG in the middle. We thought this was the best option because we assumed that due to the small size of the bot and the small offset the US had there wouldn't be any obstacles too narrow that the US would miss them and the bot would crash. This assumption turned out to be true and even with the chairs and peoples legs in Detkin we did not have any issues with crashing the bot. 
+
+HRS 07 - 'WT shall provide method of yaw rotation of WG'
+
+As discussed previously, since we did not have a WT this hardware specification was not possible to implement. Instead of providing yaw through a rotatable WT, the algorithim that we wrote to move the bot and shoot would rotate the bot to center on a fire and then the WG would only have to shoot straight. This allowed us to simplify our design while still maintaining functionality. 
+
+HRS 08 - 'WT should provide method of pitch rotation of WG, or WG should be controllable in distace'
+
+We also removed the need for pitch rotation by angling our acryllic so that our WG was pointed parallel to the ground. This combined with a known force and change in angle of the servo allowed us to fix the distance that the WG was able to shoot. Using these we included in the algorithm that as long as the hot object was between the minimum and maximum distances reached by our horizontal WG (~10cm to 100cm) it would shoot and if it were outside this range it would move to be in that range before firing the WG. 
+
+HRS 09 - 'WP shall provide protection of MT, MC, RC, TI, and US from liquids shot by WG'
+
+We achieved this HRS by using clear laser cut acryllic glue to the sides and with a plate glued across the top as well. We glued the acryllic at a downward sloping angle and with a cantileverd front (which can be seen in the images of our bot). This allowed any water that did end up dripping to be forced down in front and ahead of the bot so none would get on the bot. In testing even when pouring water onto the acryllic plate -- which is much more water than we would ever expect from a leaking WG -- the bot was kept completely dry.
 
 ### 4. Conclusion
 
 Reflect on your project. Some questions to consider: What did you learn from it? What went well? What accomplishments are you proud of? What did you learn/gain from this experience? Did you have to change your approach? What could have been done differently? Did you encounter obstacles that you didn’t anticipate? What could be a next step for this project?
 
+Isaac:
+This project was very enjoyable and rewarding overall however there were a couple of issues and difficulties that if we were to do it again I would make sure to avoid or fix. I think the main one was we definitley started a bit late. The main issue with this is that we didn't have enough time to order some of the parts we would have liked including more water guns to attach to our bot as well as Blynk premium which we only realized we needed the day before demo day. Another issue that arose from lack from planning was we didn't have as much time as we would have liked to test our bot before demo day. This wasn't as bad as an issue for us specifically because we got a bit lucky and our project worked very well with minimal testing, but it just as easily could have had a bunch of small bugs that we wouldn't have been able to fix due to lack of time. Overall other than this small issue I think this project went extremly well with minimal large issues that had us stuck for long periods of time. Instead we were really able to focus on creating and innovating on our product instead of just thinking about what is causing bugs. This allowed us to have a lot of fun adding things like sirens and LEDs clear laser cut acryllic for waterproofing. One of the obstacles we encountered was powering the bot. We had a bunch of features and that added up to the point to where the katzbot couldn't provide enough power when it was turning quickly (we think this is due to the inductive spikes in the motors) this led to the ATMega latching sometimes and we couldn't figure it out for a while until we powered it seperatley from the rest of the board and there was no latching issue. This issue brought in concepts from previous classes which was fun that we used them to solve this strange bug, and once we found it it was a realitvely easy fix. One small thing on the car that I am very proud of is that all the blinking LEDs are powered off of one GPIO pin. We were running out of pin space, so we had to get creative and so I had the GPIO pin driving both a pmos and an nmos to get complementary switching while saving pin space. Overall I had a lot of fun with this project and I am happy we were able to make something consistent with a very cool application that could maybe one day help the world. One interesting thing that I would love to do next is add more infared sensors, more water guns, and then improve the autonomous algorithm to the point where it can seek out fires and put them out with more water power than just one small squirt gun which was a proof of concept more than anything. An actual water pump to deliver non-trivial amounts of water would be ideal. 
+
+Oliver:
+Overall, this project went well and I am very satified with our final result. I learned quite a bit, especially about I2C -- both about how the protocol works in full in practice, and how the ATMega works with it. There were certainly some issues that could have caused a lot of headache, but prior experience from this class and the ATMega combined with experience from other classes and extracirricular activites prepared us and we were able to solve them quickly. I do agree that we started late, and we are a little lucky that we were able to accomplish everything we wanted in time. I am also proud, however, of our ability to diagnose and fix the issues we did encounter. When the ATMega would randomly latch, we were able to diagnose that it was due to a power issue, and moved the ATMega to a different power supply. This caused its own separate issue of alignment with the I2C thermal camera, as one starting before the other could (and did) cause messages to be lost. We were able to diagnose this and then implement a watchdog relatively quickly to fix it. I am also relatively proud of our code structure. We use a multitude of different timers and interrupts for everything, including the ultrasonic sensor, LEDs, siren, servo, and thermal camera, and had to maintain a clean codebase in order to avoid issues. We were able to accomplish all of this on the ATMega, with lots of configuration options. I very much enjoyed our very mean-looking watergun-servo combo, and it was cool that it was able to shoot a fair distance. We had to change our approach in some respects, mostly to simplify the process in order to actually meet our required deadline and accomplish what was important and relevant to the class. For example, we did not have a separate water turret, we just attached the watergun to the katzbot and turned that instead. However, this did not impact functionality greatly but simplified the work we had to do considerably. In terms of what could have been done differently, we definitely could have started integration a little earlier. We had the ultrasonic sensor, thermal camera, servo, wireless, and katzbot working seperately for a while, but putting them together was more effort than expected. An unanticipated obstacle was the Blynk.io limit of 5 buttons to control the virtual pins. This mean that we weren't able to shoot the watergun manually because all inputs were full determining driving and mode. Overall, the project was very fun and I am very happy with how it turned out. A next step would be to add more firepower, and to have even better autonomous code.
+
 ## References
 
 Fill in your references here as you work on your proposal and final submission. Describe any libraries used here.
+
+No libraries were used aside from the ATMega interface provided by AVR and microchip studio. The references used were soley the datasheets for the ATMega, thermal camera, ultrasonic sensor, ESP32 Feather, and other components.
 
 ## Github Repo Submission Resources
 
