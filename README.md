@@ -168,11 +168,24 @@ If you’ve never made a Github pages website before, you can follow this webpag
 
 ### 1. Video
 
-[Insert final project video here]
+[Final Project View](https://drive.google.com/file/d/1rRjakALm1ZBWU0vQcANKmq7VALeC-x5L/view?usp=drive_link)
+
+<iframe src="https://drive.google.com/file/d/1rRjakALm1ZBWU0vQcANKmq7VALeC-x5L/preview" width="640" height="480" allow="autoplay"></iframe>
 
 ### 2. Images
 
-[Insert final project images here]
+Blynk Console:
+
+![Blynk Console](Blynk.png)
+
+Front View:
+
+![Front View](Front_View.jpg)
+
+Back View:
+
+![Front View](Back_View.jpg)
+
 
 ### 3. Results
 
